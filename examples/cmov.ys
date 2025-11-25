@@ -1,0 +1,32 @@
+# Conditional move example
+# Demonstrates cmovXX instructions
+
+.pos 0
+    # Test cmove (move if equal)
+    irmovq $10, %rax
+    irmovq $10, %rbx
+    subq %rax, %rbx     # ZF = 1 (result is zero)
+    
+    irmovq $100, %rcx
+    irmovq $0, %rdx
+    cmove %rcx, %rdx    # Should move since ZF = 1
+    
+    # Test cmovne (move if not equal)
+    irmovq $10, %rax
+    irmovq $20, %rbx
+    subq %rax, %rbx     # ZF = 0 (result is 10)
+    
+    irmovq $200, %rcx
+    irmovq $0, %rsi
+    cmovne %rcx, %rsi   # Should move since ZF = 0
+    
+    # Test cmovl (move if less)
+    irmovq $30, %rax
+    irmovq $10, %rbx
+    subq %rax, %rbx     # SF = 1 (result is -20)
+    
+    irmovq $300, %rcx
+    irmovq $0, %rdi
+    cmovl %rcx, %rdi    # Should move since SF = 1
+    
+    halt
