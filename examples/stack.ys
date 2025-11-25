@@ -1,0 +1,39 @@
+# Stack operations example
+# Demonstrates push, pop, call, and ret
+
+.pos 0
+    irmovq stack, %rsp   # Initialize stack pointer
+    
+    # Push some values
+    irmovq $1, %rax
+    pushq %rax
+    irmovq $2, %rax
+    pushq %rax
+    irmovq $3, %rax
+    pushq %rax
+    
+    # Call a function to sum the values
+    call sum_stack
+    
+    halt
+
+# Function that pops and sums three values from the stack
+# Note: We save the return address first, then get the values
+sum_stack:
+    popq %r8            # Save return address
+    popq %rbx           # Get first value (3)
+    popq %rcx           # Get second value (2)
+    popq %rdx           # Get third value (1)
+    
+    # Sum all three values
+    irmovq $0, %rax
+    addq %rbx, %rax
+    addq %rcx, %rax
+    addq %rdx, %rax
+    
+    pushq %r8           # Restore return address
+    ret
+
+# Stack starts here (at address 0x200)
+.pos 0x200
+stack:

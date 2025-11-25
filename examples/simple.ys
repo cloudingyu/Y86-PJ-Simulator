@@ -1,0 +1,7 @@
+# Simple hello program
+# Just moves some values around and halts
+
+    irmovq $42, %rax
+    irmovq $100, %rbx
+    addq %rax, %rbx
+    halt

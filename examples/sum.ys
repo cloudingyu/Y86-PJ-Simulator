@@ -1,0 +1,26 @@
+# Sum an array of numbers
+# Result is stored in %rax
+
+.pos 0
+    irmovq array, %rdi   # array pointer
+    irmovq $5, %rsi      # count
+    irmovq $0, %rax      # sum
+    irmovq $8, %r8       # sizeof(quad)
+    irmovq $1, %r9       # decrement
+
+loop:
+    mrmovq 0(%rdi), %r10
+    addq %r10, %rax
+    addq %r8, %rdi
+    subq %r9, %rsi
+    jne loop
+    halt
+
+# Data section
+.pos 0x100
+array:
+    .quad 1
+    .quad 2
+    .quad 3
+    .quad 4
+    .quad 5
