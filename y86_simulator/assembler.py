@@ -99,6 +99,24 @@ class Assembler:
         self.address = 0
         self.pending_labels = []
     
+    def _is_label_reference(self, text: str) -> bool:
+        """
+        Check if text is a label reference (not a numeric immediate).
+        
+        Args:
+            text: The text to check
+            
+        Returns:
+            True if the text is a label reference
+        """
+        text = text.strip()
+        if text.startswith("$"):
+            text = text[1:]
+        if not text:
+            return False
+        # A label starts with a letter or underscore
+        return text[0].isalpha() or text[0] == '_'
+    
     def parse_register(self, reg_str: str) -> int:
         """
         Parse a register name.
@@ -255,7 +273,7 @@ class Assembler:
             operands = operands.strip()
             if operands in self.labels:
                 self.emit_quad(self.labels[operands])
-            elif operands.isidentifier() or (operands and operands[0].isalpha()):
+            elif self._is_label_reference(operands):
                 # Forward reference
                 self.emit_label_reference(operands, line_num)
             else:
@@ -299,7 +317,7 @@ class Assembler:
             
             if val_str in self.labels:
                 self.emit_quad(self.labels[val_str])
-            elif val_str.isidentifier() or (val_str and val_str[0].isalpha()):
+            elif self._is_label_reference(val_str):
                 self.emit_label_reference(val_str, line_num)
             else:
                 self.emit_quad(self.parse_immediate(ops[0]))
@@ -338,7 +356,7 @@ class Assembler:
             dest = operands.strip()
             if dest in self.labels:
                 self.emit_quad(self.labels[dest])
-            elif dest.isidentifier() or (dest and dest[0].isalpha()):
+            elif self._is_label_reference(dest):
                 self.emit_label_reference(dest, line_num)
             else:
                 self.emit_quad(self.parse_immediate(dest))
@@ -348,7 +366,7 @@ class Assembler:
             dest = operands.strip()
             if dest in self.labels:
                 self.emit_quad(self.labels[dest])
-            elif dest.isidentifier() or (dest and dest[0].isalpha()):
+            elif self._is_label_reference(dest):
                 self.emit_label_reference(dest, line_num)
             else:
                 self.emit_quad(self.parse_immediate(dest))

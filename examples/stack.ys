@@ -12,25 +12,28 @@
     irmovq $3, %rax
     pushq %rax
     
-    # Call a function
+    # Call a function to sum the values
     call sum_stack
     
     halt
 
-# Function that pops and sums three values
+# Function that pops and sums three values from the stack
+# Note: We save the return address first, then get the values
 sum_stack:
-    popq %rax           # Pop return address... wait, that's wrong!
-    # Actually the return address is handled by ret
-    # Let's just pop the three values
-    irmovq $0, %rax     # Clear rax for sum
-    popq %rbx
+    popq %r8            # Save return address
+    popq %rbx           # Get first value (3)
+    popq %rcx           # Get second value (2)
+    popq %rdx           # Get third value (1)
+    
+    # Sum all three values
+    irmovq $0, %rax
     addq %rbx, %rax
-    popq %rbx
-    addq %rbx, %rax
-    popq %rbx
-    addq %rbx, %rax
+    addq %rcx, %rax
+    addq %rdx, %rax
+    
+    pushq %r8           # Restore return address
     ret
 
-# Stack starts here
+# Stack starts here (at address 0x200)
 .pos 0x200
 stack:

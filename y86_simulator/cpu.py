@@ -309,7 +309,7 @@ class CPU:
             if result >= (1 << 63):
                 result -= (1 << 64)
             
-            self.update_condition_codes(result, valA, valB, ifun)
+            self.update_condition_codes(result, valB, valA, ifun)
             self.set_register(rB, result)
         
         elif icode == IJXX:
