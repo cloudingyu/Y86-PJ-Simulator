@@ -109,11 +109,15 @@
 
 ## 测试要求
 
+
+### 编译
+使用命令 `g++ -std=c++17 -Wall -O2 -o cpu.exe cpu.cpp` 
+
 ### 测试环境
 - 测试脚本：test.py
 - 测试命令：`python test.py --bin {cpu可执行文件路径}`
 - 示例：
-  - `./cpu`：`python test.py --bin ./cpu`
+  - `./cpu.exe`：`python test.py --bin ./cpu.exe`
   - `python cpu.py`：`python test.py --bin "python cpu.py"`
 
 ### 测试文件
