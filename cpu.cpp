@@ -176,7 +176,7 @@ void Simulator::execute()
         else if (ifun == 2)
             valE = b & a;
         else if (ifun == 3)
-            valE = b ^ a; // xorq
+            valE = b ^ a;
 
         zf = (valE == 0);
         sf = (valE < 0);
