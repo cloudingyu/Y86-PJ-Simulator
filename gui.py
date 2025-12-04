@@ -11,24 +11,28 @@ class ModernY86Visualizer:
         self.root = root
         self.root.title("Y86-64 Simulator")
         
-        # --- 窗口全屏逻辑 ---
-        # 获取屏幕尺寸
+        # --- 窗口全屏/最大化逻辑 ---
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
         
-        # 尝试最大化/全屏
+        # 1. 基础保底
+        self.root.geometry(f"{screen_width}x{screen_height}+0+0")
+        
+        # 2. 尝试系统级最大化/全屏
         try:
-            # Windows: state('zoomed') 是最大化（保留标题栏）
-            # 如果你想要完全的全屏（无标题栏），可以用 attributes('-fullscreen', True)
-            # 这里我们用最大化，方便操作
-            self.root.state('zoomed')
-        except:
-            try:
-                # Linux/Unix
+            if platform.system() == "Windows":
+                self.root.state('zoomed')
+            elif platform.system() == "Linux":
                 self.root.attributes('-zoomed', True)
-            except:
-                # 最后的保底：手动设置几何尺寸为屏幕大小
-                self.root.geometry(f"{screen_width}x{screen_height}+0+0")
+            elif platform.system() == "Darwin": # macOS
+                try:
+                    self.root.attributes("-fullscreen", True)
+                    # 绑定 ESC 退出全屏
+                    self.root.bind("<Escape>", lambda event: self.root.attributes("-fullscreen", False))
+                except:
+                    pass
+        except:
+            pass
         
         # --- 字体配置 ---
         # 1. 代码/数据字体 (硬核风格)
@@ -50,7 +54,8 @@ class ModernY86Visualizer:
             "stat_ok": "#107c10",      
             "stat_err": "#d13438",
             "cache_title": "#d13438",  
-            "grid_line": "#e0e0e0"     
+            "grid_line": "#e0e0e0",
+            "comment": "#9aa0a6"       # [新增] 注释颜色 (浅灰)
         }
         
         self.style = ttk.Style()
@@ -72,27 +77,27 @@ class ModernY86Visualizer:
         self.style.configure("TFrame", background=self.colors["bg"])
         self.style.configure("Panel.TFrame", background=self.colors["panel_bg"], relief="flat")
         
-        # [巨大化] UI 标签 (16 -> 18)
+        # UI 标签
         self.style.configure("TLabel", 
             background=self.colors["bg"], 
             foreground=self.colors["fg"], 
             font=(self.font_ui, 18)
         )
-        # [巨大化] 标题 (20 -> 24)
+        # 标题
         self.style.configure("Header.TLabel", 
             background=self.colors["panel_bg"], 
             foreground=self.colors["fg"], 
             font=(self.font_ui, 24, "bold")
         )
         
-        # [巨大化] 数值标签 (18 -> 20)
+        # 数值标签 (通用)
         self.style.configure("Value.TLabel", 
             background=self.colors["panel_bg"], 
             foreground=self.colors["mem_fg"], 
             font=(self.font_code, 20)
         )
         
-        # [巨大化] 按钮 (16 -> 18)
+        # 按钮
         self.style.configure("Accent.TButton", 
             background=self.colors["accent"], 
             foreground="white", 
@@ -105,20 +110,20 @@ class ModernY86Visualizer:
             foreground=[('disabled', '#666666')]
         )
         
-        # [巨大化] 状态栏数值 (24 -> 28)
+        # 状态栏数值
         self.style.configure("Status.TLabel", 
             background=self.colors["panel_bg"], 
             foreground=self.colors["stat_ok"], 
-            font=(self.font_code, 28, "bold")
+            font=(self.font_code, 18, "bold")
         )
-        # [巨大化] Cache 标题 (24 -> 28)
+        # Cache 标题
         self.style.configure("Cache.TLabel", 
             background=self.colors["panel_bg"], 
             foreground=self.colors["cache_title"], 
             font=(self.font_code, 28, "bold")
         )
 
-        # [巨大化] 表格 (Treeview) (18 -> 20)
+        # 表格 (Treeview)
         self.style.configure("Treeview.Heading", 
             font=(self.font_ui, 20, "bold"),
             background=self.colors["panel_bg"],
@@ -130,7 +135,7 @@ class ModernY86Visualizer:
             foreground=self.colors["mem_fg"],
             fieldbackground=self.colors["mem_bg"],
             font=(self.font_code, 20),
-            rowheight=50, # 极大行高
+            rowheight=50, 
             borderwidth=0
         )
         self.style.map('Treeview', 
@@ -155,7 +160,6 @@ class ModernY86Visualizer:
         self.btn_next = ttk.Button(btn_frame, text="Next ▶", style="Accent.TButton", command=self.next_step, state=tk.DISABLED)
         self.btn_next.pack(side=tk.LEFT, padx=10)
 
-        # [巨大化] 进度条 (16 -> 18)
         self.lbl_progress = ttk.Label(control_bar, text="Ready", font=(self.font_ui, 18))
         self.lbl_progress.pack(side=tk.RIGHT, padx=20)
 
@@ -163,9 +167,10 @@ class ModernY86Visualizer:
         main_pane = ttk.Frame(self.root, style="TFrame", padding=20)
         main_pane.pack(fill=tk.BOTH, expand=True)
         
-        main_pane.columnconfigure(0, weight=1) 
-        main_pane.columnconfigure(1, weight=2) 
-        main_pane.columnconfigure(2, weight=1) 
+        # 3:5:4 比例
+        main_pane.columnconfigure(0, weight=3, uniform="group1") 
+        main_pane.columnconfigure(1, weight=5, uniform="group1") 
+        main_pane.columnconfigure(2, weight=4, uniform="group1") 
         main_pane.rowconfigure(0, weight=1)
 
         # 左侧
@@ -185,12 +190,11 @@ class ModernY86Visualizer:
         src_frame = ttk.Frame(mid_panel, style="Panel.TFrame")
         src_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
-        # [巨大化] 源码字体 (18 -> 20)
         self.src_text = tk.Text(src_frame,
             bg=self.colors["mem_bg"], 
             fg=self.colors["fg"],
             insertbackground="black",
-            font=(self.font_code, 20),
+            font=(self.font_code, 18),
             bd=0,
             highlightthickness=0,
             state=tk.DISABLED,
@@ -198,6 +202,8 @@ class ModernY86Visualizer:
             padx=20, pady=15
         )
         self.src_text.tag_config("current_line", background=self.colors["line_hl"])
+        # [新增] 注释高亮标签配置
+        self.src_text.tag_config("comment", foreground=self.colors["comment"])
         
         src_scroll_y = ttk.Scrollbar(src_frame, orient="vertical", command=self.src_text.yview)
         src_scroll_x = ttk.Scrollbar(src_frame, orient="horizontal", command=self.src_text.xview)
@@ -216,13 +222,11 @@ class ModernY86Visualizer:
         mem_frame = ttk.Frame(right_panel, style="Panel.TFrame")
         mem_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
-        # 使用 Treeview
         columns = ("addr", "val")
         self.mem_tree = ttk.Treeview(mem_frame, columns=columns, show="headings", selectmode="browse")
         
         self.mem_tree.heading("addr", text="Address")
         self.mem_tree.heading("val", text="Value (Hex)")
-        # 增加列宽
         self.mem_tree.column("addr", width=180, anchor="center")
         self.mem_tree.column("val", width=300, anchor="center")
         
@@ -299,15 +303,18 @@ class ModernY86Visualizer:
         regs = ["rax", "rcx", "rdx", "rbx", "rsp", "rbp", "rsi", "rdi", 
                 "r8", "r9", "r10", "r11", "r12", "r13", "r14"]
         
+        for i in range(len(regs)):
+            grid_frame.rowconfigure(i, weight=1)
+
         for i, rname in enumerate(regs):
             row = i
-            # [巨大化] 寄存器名字体 (18 -> 20)
             lbl_name = ttk.Label(grid_frame, text=f"%{rname}", width=5, 
-                               background=self.colors["panel_bg"], foreground="#666666", font=(self.font_code, 20))
-            lbl_name.grid(row=row, column=0, sticky="w", pady=5)
+                               background=self.colors["panel_bg"], foreground="#666666", font=(self.font_code, 18))
+            lbl_name.grid(row=row, column=0, sticky="w", pady=3)
             
             lbl_val = ttk.Label(grid_frame, text="0x0000000000000000", style="Value.TLabel")
-            lbl_val.grid(row=row, column=1, sticky="e", padx=(20, 0), pady=5)
+            lbl_val.configure(font=(self.font_code, 18))
+            lbl_val.grid(row=row, column=1, sticky="e", padx=(20, 0), pady=3)
             
             self.reg_widgets[rname] = lbl_val
 
@@ -356,6 +363,32 @@ class ModernY86Visualizer:
         self.src_text.config(state=tk.NORMAL)
         self.src_text.delete(1.0, tk.END)
         self.src_text.insert(tk.END, source_content)
+        
+        # [核心逻辑] 注释高亮
+        count_var = tk.IntVar()
+        
+        # 1. 高亮井号注释 (# ...)
+        start_idx = "1.0"
+        while True:
+            # 查找 #
+            idx = self.src_text.search(r"#.*", start_idx, stopindex=tk.END, regexp=True, count=count_var)
+            if not idx:
+                break
+            # 计算结束位置
+            end_idx = f"{idx}+{count_var.get()}c"
+            self.src_text.tag_add("comment", idx, end_idx)
+            start_idx = end_idx
+            
+        # 2. 高亮 C 风格注释 (/* ... */)
+        start_idx = "1.0"
+        while True:
+            idx = self.src_text.search(r"/\*.*?\*/", start_idx, stopindex=tk.END, regexp=True, count=count_var)
+            if not idx:
+                break
+            end_idx = f"{idx}+{count_var.get()}c"
+            self.src_text.tag_add("comment", idx, end_idx)
+            start_idx = end_idx
+
         self.src_text.config(state=tk.DISABLED)
         
         for i, line in enumerate(lines):
@@ -408,7 +441,7 @@ class ModernY86Visualizer:
             self.var_rate.set(f"{c['rate']:.1f}%")
 
         self.src_text.tag_remove("current_line", "1.0", tk.END)
-        line_num = self.pc_to_line.get(current_pc)
+        line_num = self.pc_to_line.get(state['PC'])
         if line_num:
             self.src_text.tag_add("current_line", f"{line_num}.0", f"{line_num+1}.0")
             self.src_text.see(f"{line_num}.0")
@@ -422,18 +455,15 @@ class ModernY86Visualizer:
                 unsigned_val = val & 0xFFFFFFFFFFFFFFFF
                 hex_val = f"0x{unsigned_val:016x}"
                 widget.config(text=hex_val)
-                
                 if prev_reg and prev_reg.get(rname) != val:
-                    widget.configure(foreground=self.colors["highlight"], font=(self.font_code, 20, "bold"))
+                    widget.configure(foreground=self.colors["highlight"], font=(self.font_code, 18, "bold"))
                 else:
-                    widget.configure(foreground=self.colors["mem_fg"], font=(self.font_code, 20))
+                    widget.configure(foreground=self.colors["mem_fg"], font=(self.font_code, 18))
 
         for item in self.mem_tree.get_children():
             self.mem_tree.delete(item)
-        
         mem_data = state['MEM']
         sorted_addr = sorted([int(k) for k in mem_data.keys()])
-        
         for addr in sorted_addr:
             val = mem_data[str(addr)]
             unsigned_val = val & 0xFFFFFFFFFFFFFFFF
