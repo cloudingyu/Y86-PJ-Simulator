@@ -15,13 +15,13 @@ Simulator::Simulator()
     stat = Stat::AOK;
 }
 
-unsigned char hexToByte(const std::string &hex)
+uint8_t hexToByte(const std::string &hex)
 {
     unsigned int val;
     std::stringstream ss;
     ss << std::hex << hex;
     ss >> val;
-    return static_cast<unsigned char>(val);
+    return static_cast<uint8_t>(val);
 }
 
 void Simulator::loadProgram()
@@ -67,6 +67,70 @@ void Simulator::loadProgram()
     }
 }
 
+void Simulator::loadBlockToCache(int set_index, unsigned long long tag)
+{
+    long long block_start_addr = (tag << (BLOCK_BITS + 4)) | (set_index << BLOCK_BITS);
+
+    CacheLine &line = cache[set_index];
+    for (int i = 0; i < BLOCK_SIZE; ++i)
+    {
+        long long mem_addr = block_start_addr + i;
+        if (mem_addr < MEM_SIZE)
+        {
+            line.block[i] = memory[mem_addr];
+        }
+        else
+        {
+            line.block[i] = 0;
+        }
+    }
+    line.tag = tag;
+    line.valid = true;
+}
+
+uint8_t Simulator::readByteCached(long long addr)
+{
+    unsigned long long set_index = (addr >> BLOCK_BITS) & (CACHE_SETS - 1);
+    unsigned long long tag = addr >> (BLOCK_BITS + 4);
+    unsigned long long offset = addr & (BLOCK_SIZE - 1);
+
+    CacheLine &line = cache[set_index];
+
+    if (line.valid && line.tag == tag)
+    {
+        cache_hits++;
+        return line.block[offset];
+    }
+    else
+    {
+        cache_misses++;
+        loadBlockToCache(set_index, tag);
+        return line.block[offset];
+    }
+}
+
+void Simulator::writeByteCached(long long addr, uint8_t val)
+{
+    memory[addr] = val;
+
+    unsigned long long set_index = (addr >> BLOCK_BITS) & (CACHE_SETS - 1);
+    unsigned long long tag = addr >> (BLOCK_BITS + 4);
+    unsigned long long offset = addr & (BLOCK_SIZE - 1);
+
+    CacheLine &line = cache[set_index];
+
+    if (line.valid && line.tag == tag)
+    {
+        cache_hits++;
+        line.block[offset] = val;
+    }
+    else
+    {
+        cache_misses++;
+        loadBlockToCache(set_index, tag);
+    }
+}
+
 long long Simulator::readLong(long long addr)
 {
     if (addr < 0 || addr + 8 > MEM_SIZE)
@@ -77,7 +141,8 @@ long long Simulator::readLong(long long addr)
     long long val = 0;
     for (int i = 0; i < 8; ++i)
     {
-        val |= (long long)memory[addr + i] << (i * 8);
+        uint8_t byte = readByteCached(addr + i);
+        val |= (long long)byte << (i * 8);
     }
     return val;
 }
@@ -91,7 +156,8 @@ void Simulator::writeLong(long long addr, long long val)
     }
     for (int i = 0; i < 8; ++i)
     {
-        memory[addr + i] = (val >> (i * 8)) & 0xFF;
+        uint8_t byte = (val >> (i * 8)) & 0xFF;
+        writeByteCached(addr + i, byte);
     }
 }
 
@@ -102,11 +168,9 @@ void Simulator::fetch()
         stat = Stat::ADR;
         return;
     }
-
-    unsigned char byte0 = memory[PC];
+    uint8_t byte0 = memory[PC];
     icode = (byte0 >> 4) & 0xF;
     ifun = byte0 & 0xF;
-
     if (icode > 0xB)
     {
         stat = Stat::INS;
@@ -114,15 +178,13 @@ void Simulator::fetch()
     }
 
     valP = PC + 1;
-
     bool need_regs = (icode == ICode::RRMOVQ || icode == ICode::OPQ ||
                       icode == ICode::PUSHQ || icode == ICode::POPQ ||
                       icode == ICode::IRMOVQ || icode == ICode::RMMOVQ ||
                       icode == ICode::MRMOVQ);
-
     if (need_regs)
     {
-        unsigned char byte1 = memory[valP];
+        uint8_t byte1 = memory[valP];
         rA = (byte1 >> 4) & 0xF;
         rB = byte1 & 0xF;
         valP += 1;
@@ -136,10 +198,12 @@ void Simulator::fetch()
     bool need_valC = (icode == ICode::IRMOVQ || icode == ICode::RMMOVQ ||
                       icode == ICode::MRMOVQ || icode == ICode::JXX ||
                       icode == ICode::CALL);
-
     if (need_valC)
     {
-        valC = readLong(valP);
+        long long val = 0;
+        for (int i = 0; i < 8; ++i)
+            val |= (long long)memory[valP + i] << (i * 8);
+        valC = val;
         valP += 8;
     }
 }
@@ -151,7 +215,6 @@ void Simulator::decode()
         srcA = rA;
     else if (icode == ICode::POPQ || icode == ICode::RET)
         srcA = Reg::RSP;
-
     valA = (srcA == Reg::NONE) ? 0 : reg[srcA];
 
     int srcB = Reg::NONE;
@@ -159,7 +222,6 @@ void Simulator::decode()
         srcB = rB;
     else if (icode == ICode::PUSHQ || icode == ICode::POPQ || icode == ICode::CALL || icode == ICode::RET)
         srcB = Reg::RSP;
-
     valB = (srcB == Reg::NONE) ? 0 : reg[srcB];
 }
 
@@ -167,8 +229,7 @@ void Simulator::execute()
 {
     if (icode == ICode::OPQ)
     {
-        long long a = valA;
-        long long b = valB;
+        long long a = valA, b = valB;
         if (ifun == 0)
             valE = b + a;
         else if (ifun == 1)
@@ -177,7 +238,6 @@ void Simulator::execute()
             valE = b & a;
         else if (ifun == 3)
             valE = b ^ a;
-
         zf = (valE == 0);
         sf = (valE < 0);
         if (ifun == 0)
@@ -188,25 +248,15 @@ void Simulator::execute()
             of = false;
     }
     else if (icode == ICode::IRMOVQ)
-    {
         valE = valC;
-    }
     else if (icode == ICode::RRMOVQ)
-    {
         valE = valA;
-    }
     else if (icode == ICode::RMMOVQ || icode == ICode::MRMOVQ)
-    {
         valE = valB + valC;
-    }
     else if (icode == ICode::PUSHQ || icode == ICode::CALL)
-    {
         valE = valB - 8;
-    }
     else if (icode == ICode::POPQ || icode == ICode::RET)
-    {
         valE = valB + 8;
-    }
 
     if (icode == ICode::JXX || icode == ICode::RRMOVQ)
     {
@@ -237,7 +287,6 @@ void Simulator::execute()
             cnd = false;
         }
     }
-
     if (icode == ICode::HALT)
         stat = Stat::HLT;
 }
@@ -283,14 +332,12 @@ void Simulator::write_back()
         dstE = rB;
     else if (icode == ICode::PUSHQ || icode == ICode::POPQ || icode == ICode::CALL || icode == ICode::RET)
         dstE = Reg::RSP;
-
     if (dstE != Reg::NONE)
         reg[dstE] = valE;
 
     int dstM = Reg::NONE;
     if (icode == ICode::MRMOVQ || icode == ICode::POPQ)
         dstM = rA;
-
     if (dstM != Reg::NONE)
         reg[dstM] = valM;
 }
@@ -298,26 +345,15 @@ void Simulator::write_back()
 void Simulator::pc_update()
 {
     if (stat != Stat::AOK)
-    {
         return;
-    }
-
     if (icode == ICode::CALL)
-    {
         PC = valC;
-    }
     else if (icode == ICode::RET)
-    {
         PC = valM;
-    }
     else if (icode == ICode::JXX)
-    {
         PC = cnd ? valC : valP;
-    }
     else
-    {
         PC = valP;
-    }
 }
 
 void Simulator::printJsonState(bool isFirst)
@@ -329,13 +365,24 @@ void Simulator::printJsonState(bool isFirst)
     j["CC"]["SF"] = sf ? 1 : 0;
     j["CC"]["OF"] = of ? 1 : 0;
 
+    if (gui_mode)
+    {
+        j["CACHE"]["hits"] = cache_hits;
+        j["CACHE"]["misses"] = cache_misses;
+        long long total = cache_hits + cache_misses;
+        j["CACHE"]["total"] = total;
+        j["CACHE"]["rate"] = (total > 0) ? (double)cache_hits / total * 100.0 : 0.0;
+    }
+
     const char *rNames[] = {"rax", "rcx", "rdx", "rbx", "rsp", "rbp", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14"};
     for (int i = 0; i < 15; ++i)
         j["REG"][rNames[i]] = reg[i];
 
     for (int i = 0; i < MEM_SIZE; i += 8)
     {
-        long long val = readLong(i);
+        long long val = 0;
+        for (int b = 0; b < 8; ++b)
+            val |= (long long)memory[i + b] << (b * 8);
         if (val != 0)
             j["MEM"][std::to_string(i)] = val;
     }
@@ -357,26 +404,30 @@ void Simulator::run()
             printJsonState(isFirst);
             break;
         }
-
         decode();
         execute();
         memory_access();
         write_back();
         pc_update();
-
         printJsonState(isFirst);
         isFirst = false;
-
         if (PC < 0 || PC >= MEM_SIZE)
             break;
     }
     std::cout << "]" << std::endl;
 }
 
-int main()
+int main(int argc, char *argv[])
 {
     Simulator sim;
+
+    if (argc > 1 && std::string(argv[1]) == "-v")
+    {
+        sim.setGuiMode(true);
+    }
+
     sim.loadProgram();
     sim.run();
+
     return 0;
 }

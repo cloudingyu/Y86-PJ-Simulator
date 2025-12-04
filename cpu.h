@@ -49,16 +49,28 @@ namespace Stat {
     const int INS = 4;
 }
 
+struct CacheLine {
+    bool valid = false;
+    unsigned long long tag = 0;
+    uint8_t block[32]; 
+};
+
 class Simulator
 {
 public:
     Simulator();
     void loadProgram();
     void run();
+    
+    void setGuiMode(bool mode) { gui_mode = mode; }
+
+    long long cache_hits = 0;
+    long long cache_misses = 0;
 
 private:
     long long PC = 0;
-    std::vector<unsigned char> memory;
+    
+    std::vector<uint8_t> memory;
     std::array<long long, 15> reg;
     
     bool zf = true;
@@ -66,6 +78,12 @@ private:
     bool of = false;
 
     int stat = Stat::AOK;
+    bool gui_mode = false;
+
+    static const int CACHE_SETS = 16;
+    static const int BLOCK_SIZE = 32;
+    static const int BLOCK_BITS = 5; 
+    std::array<CacheLine, CACHE_SETS> cache;
 
     int icode = 0;
     int ifun = 0;
@@ -91,6 +109,10 @@ private:
     long long readLong(long long addr);
     void writeLong(long long addr, long long val);
     void printJsonState(bool isFirst);
+    
+    uint8_t readByteCached(long long addr);
+    void writeByteCached(long long addr, uint8_t val);
+    void loadBlockToCache(int set_index, unsigned long long tag);
 };
 
 #endif

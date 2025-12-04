@@ -9,31 +9,29 @@ import re
 class ModernY86Visualizer:
     def __init__(self, root):
         self.root = root
-        self.root.title("Y86-64 Simulator - IDE Mode")
-        self.root.geometry("1300x750")
+        self.root.title("Y86-64 Simulator - Ultimate Edition")
+        self.root.geometry("1300x850") # 高度增加以容纳 Cache 面板
         
-        # --- Font Configuration ---
-        # 1. Code/Data Font: For registers, memory, source code, hex values
+        # --- 字体配置 ---
         self.font_code = "Maple Mono"
-        # 2. UI Font: For buttons, headers, labels (Cleaner sans-serif)
         self.font_ui = "Segoe UI" 
         
-        # --- 1. Color Scheme (Light Theme) ---
+        # --- 配色方案 (Light Theme) ---
         self.colors = {
-            "bg": "#fafafa",           # Overall Background
-            "panel_bg": "#f3f3f3",     # Panel Background
-            "fg": "#333333",           # Default Text
-            "accent": "#0078d4",       # Accent Color (Blue)
+            "bg": "#fafafa",           
+            "panel_bg": "#f3f3f3",     
+            "fg": "#333333",           
+            "accent": "#0078d4",       
             "accent_hover": "#2b88d8", 
-            "highlight": "#d13438",    # Highlight Change (Red)
-            "line_hl": "#e1f0fa",      # Source Line Highlight
-            "mem_bg": "#ffffff",       # Memory/Source Background (White)
-            "mem_fg": "#0451a5",       # Memory Data (Deep Blue)
-            "stat_ok": "#107c10",      # Status OK (Green)
-            "stat_err": "#d13438"      # Status Error (Red)
+            "highlight": "#d13438",    
+            "line_hl": "#e1f0fa",      
+            "mem_bg": "#ffffff",       
+            "mem_fg": "#0451a5",       
+            "stat_ok": "#107c10",      
+            "stat_err": "#d13438",
+            "cache_title": "#d13438"   # Cache 标题颜色
         }
         
-        # --- 2. Configure Style ---
         self.style = ttk.Style()
         if 'clam' in self.style.theme_names():
             self.style.theme_use('clam')
@@ -41,21 +39,17 @@ class ModernY86Visualizer:
         self.configure_styles()
         self.root.configure(bg=self.colors["bg"])
 
-        # --- 3. Data State ---
         self.states = []
         self.current_step = 0
         self.reg_widgets = {} 
         self.pc_to_line = {} 
         
-        # --- 4. Build UI ---
         self.setup_ui()
 
     def configure_styles(self):
-        # General Frame
         self.style.configure("TFrame", background=self.colors["bg"])
         self.style.configure("Panel.TFrame", background=self.colors["panel_bg"], relief="flat")
         
-        # UI Labels
         self.style.configure("TLabel", 
             background=self.colors["bg"], 
             foreground=self.colors["fg"], 
@@ -67,14 +61,12 @@ class ModernY86Visualizer:
             font=(self.font_ui, 11, "bold")
         )
         
-        # Value Labels
         self.style.configure("Value.TLabel", 
             background=self.colors["panel_bg"], 
             foreground=self.colors["mem_fg"], 
             font=(self.font_code, 11)
         )
         
-        # Button Style
         self.style.configure("Accent.TButton", 
             background=self.colors["accent"], 
             foreground="white", 
@@ -87,15 +79,21 @@ class ModernY86Visualizer:
             foreground=[('disabled', '#666666')]
         )
         
-        # Status Bar Values
         self.style.configure("Status.TLabel", 
             background=self.colors["panel_bg"], 
             foreground=self.colors["stat_ok"], 
             font=(self.font_code, 12, "bold")
         )
+        
+        # Cache 专用样式
+        self.style.configure("Cache.TLabel", 
+            background=self.colors["panel_bg"], 
+            foreground=self.colors["cache_title"], 
+            font=(self.font_code, 12, "bold")
+        )
 
     def setup_ui(self):
-        # === Top Control Bar ===
+        # 顶部控制栏
         control_bar = ttk.Frame(self.root, style="TFrame", padding=(10, 15))
         control_bar.pack(side=tk.TOP, fill=tk.X)
         
@@ -114,22 +112,24 @@ class ModernY86Visualizer:
         self.lbl_progress = ttk.Label(control_bar, text="Ready", font=(self.font_ui, 10))
         self.lbl_progress.pack(side=tk.RIGHT, padx=10)
 
-        # === Main Content Area (3 Columns) ===
+        # 主内容区
         main_pane = ttk.Frame(self.root, style="TFrame", padding=10)
         main_pane.pack(fill=tk.BOTH, expand=True)
         
-        main_pane.columnconfigure(0, weight=1) # Registers
-        main_pane.columnconfigure(1, weight=2) # Source Code
-        main_pane.columnconfigure(2, weight=1) # Memory
+        main_pane.columnconfigure(0, weight=1) # Left
+        main_pane.columnconfigure(1, weight=2) # Mid
+        main_pane.columnconfigure(2, weight=1) # Right
         main_pane.rowconfigure(0, weight=1)
 
-        # --- Column 1: CPU State ---
+        # --- 左侧面板：状态 + Cache + 寄存器 ---
         left_panel = ttk.Frame(main_pane, style="TFrame")
         left_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
+        
         self.create_status_card(left_panel)
+        self.create_cache_card(left_panel) # [已恢复] Cache 面板
         self.create_register_card(left_panel)
 
-        # --- Column 2: Source Code ---
+        # --- 中间面板：源代码 ---
         mid_panel = ttk.Frame(main_pane, style="Panel.TFrame")
         mid_panel.grid(row=0, column=1, sticky="nsew", padx=(0, 10))
         
@@ -138,7 +138,6 @@ class ModernY86Visualizer:
         src_frame = ttk.Frame(mid_panel, style="Panel.TFrame")
         src_frame.pack(fill=tk.BOTH, expand=True, padx=2, pady=2)
         
-        # Source code area
         self.src_text = tk.Text(src_frame,
             bg=self.colors["mem_bg"], 
             fg=self.colors["fg"],
@@ -159,7 +158,7 @@ class ModernY86Visualizer:
         src_scroll_x.pack(side=tk.BOTTOM, fill=tk.X)
         self.src_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-        # --- Column 3: Memory ---
+        # --- 右侧面板：内存 ---
         right_panel = ttk.Frame(main_pane, style="Panel.TFrame")
         right_panel.grid(row=0, column=2, sticky="nsew")
         
@@ -192,27 +191,55 @@ class ModernY86Visualizer:
         content = ttk.Frame(card, style="Panel.TFrame")
         content.pack(fill=tk.X)
         
-        # PC
         self.var_pc = tk.StringVar(value="0x0")
         pc_frame = ttk.Frame(content, style="Panel.TFrame")
         pc_frame.pack(side=tk.LEFT, padx=(0, 15))
         ttk.Label(pc_frame, text="PC", foreground="#666666", background=self.colors["panel_bg"]).pack(anchor="w")
         ttk.Label(pc_frame, textvariable=self.var_pc, style="Status.TLabel", foreground=self.colors["accent"]).pack(anchor="w")
         
-        # CC (Updated to ZF/SF/OF)
         self.var_cc = tk.StringVar(value="ZF=1 SF=0 OF=0")
         cc_frame = ttk.Frame(content, style="Panel.TFrame")
         cc_frame.pack(side=tk.LEFT, padx=(0, 15))
         ttk.Label(cc_frame, text="Flags", foreground="#666666", background=self.colors["panel_bg"]).pack(anchor="w")
         ttk.Label(cc_frame, textvariable=self.var_cc, style="Status.TLabel", foreground=self.colors["fg"]).pack(anchor="w")
 
-        # STAT
         self.var_stat = tk.StringVar(value="AOK")
         stat_frame = ttk.Frame(content, style="Panel.TFrame")
         stat_frame.pack(side=tk.LEFT)
         ttk.Label(stat_frame, text="Stat", foreground="#666666", background=self.colors["panel_bg"]).pack(anchor="w")
         self.lbl_stat = ttk.Label(stat_frame, textvariable=self.var_stat, style="Status.TLabel")
         self.lbl_stat.pack(anchor="w")
+
+    # [已恢复] Cache 卡片
+    def create_cache_card(self, parent):
+        card = ttk.Frame(parent, style="Panel.TFrame", padding=15)
+        card.pack(fill=tk.X, pady=(0, 10))
+        
+        ttk.Label(card, text="Cache Statistics", style="Header.TLabel").pack(anchor="w", pady=(0, 10))
+        
+        content = ttk.Frame(card, style="Panel.TFrame")
+        content.pack(fill=tk.X)
+
+        # Hits
+        self.var_hits = tk.StringVar(value="0")
+        f1 = ttk.Frame(content, style="Panel.TFrame")
+        f1.pack(side=tk.LEFT, padx=(0, 15))
+        ttk.Label(f1, text="Hits", foreground="#666666", background=self.colors["panel_bg"]).pack(anchor="w")
+        ttk.Label(f1, textvariable=self.var_hits, style="Value.TLabel").pack(anchor="w")
+
+        # Misses
+        self.var_miss = tk.StringVar(value="0")
+        f2 = ttk.Frame(content, style="Panel.TFrame")
+        f2.pack(side=tk.LEFT, padx=(0, 15))
+        ttk.Label(f2, text="Misses", foreground="#666666", background=self.colors["panel_bg"]).pack(anchor="w")
+        ttk.Label(f2, textvariable=self.var_miss, style="Value.TLabel").pack(anchor="w")
+
+        # Rate
+        self.var_rate = tk.StringVar(value="0.0%")
+        f3 = ttk.Frame(content, style="Panel.TFrame")
+        f3.pack(side=tk.LEFT)
+        ttk.Label(f3, text="Hit Rate", foreground="#666666", background=self.colors["panel_bg"]).pack(anchor="w")
+        ttk.Label(f3, textvariable=self.var_rate, style="Cache.TLabel").pack(anchor="w")
 
     def create_register_card(self, parent):
         card = ttk.Frame(parent, style="Panel.TFrame", padding=15)
@@ -271,8 +298,9 @@ class ModernY86Visualizer:
         try:
             with open(filename, 'r', encoding='utf-8', errors='ignore') as f:
                 input_data = f.read()
-                
-            result = subprocess.run([bin_path], input=input_data, text=True, capture_output=True, encoding='utf-8')
+            
+            # [已恢复] 调用 -v 参数
+            result = subprocess.run([bin_path, '-v'], input=input_data, text=True, capture_output=True, encoding='utf-8')
             
             if result.returncode != 0 and not result.stdout:
                 raise Exception(f"Simulator crashed.\n{result.stderr}")
@@ -321,7 +349,6 @@ class ModernY86Visualizer:
         self.var_pc.set(f"0x{current_pc:x}")
         
         cc = state['CC']
-        # Updated to display full flags
         self.var_cc.set(f"ZF={cc['ZF']} SF={cc['SF']} OF={cc['OF']}")
         
         stat_map = {1: "AOK", 2: "HLT", 3: "ADR", 4: "INS"}
@@ -332,6 +359,13 @@ class ModernY86Visualizer:
             self.lbl_stat.configure(foreground=self.colors["stat_err"])
         else:
             self.lbl_stat.configure(foreground=self.colors["stat_ok"])
+
+        # [已恢复] 更新 Cache
+        if 'CACHE' in state:
+            c = state['CACHE']
+            self.var_hits.set(str(c['hits']))
+            self.var_miss.set(str(c['misses']))
+            self.var_rate.set(f"{c['rate']:.1f}%")
 
         # Source Highlight
         self.src_text.tag_remove("current_line", "1.0", tk.END)
