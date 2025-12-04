@@ -9,29 +9,31 @@ import re
 class ModernY86Visualizer:
     def __init__(self, root):
         self.root = root
-        self.root.title("Y86-64 Simulator - Light Mode")
+        self.root.title("Y86-64 Simulator - IDE Mode")
         self.root.geometry("1300x750")
         
-        # --- 字体配置 ---
+        # --- Font Configuration ---
+        # 1. Code/Data Font: For registers, memory, source code, hex values
         self.font_code = "Maple Mono"
-        self.font_ui = "LXGW Wenkai Mono"
+        # 2. UI Font: For buttons, headers, labels (Cleaner sans-serif)
+        self.font_ui = "Segoe UI" 
         
-        # --- 1. 配色方案 (Light Theme) ---
+        # --- 1. Color Scheme (Light Theme) ---
         self.colors = {
-            "bg": "#fafafa",           # 整体背景 (浅灰白)
-            "panel_bg": "#f3f3f3",     # 面板背景 (稍深一点的灰)
-            "fg": "#333333",           # 默认文字 (深灰)
-            "accent": "#0078d4",       # 强调色 (Win10 蓝)
+            "bg": "#fafafa",           # Overall Background
+            "panel_bg": "#f3f3f3",     # Panel Background
+            "fg": "#333333",           # Default Text
+            "accent": "#0078d4",       # Accent Color (Blue)
             "accent_hover": "#2b88d8", 
-            "highlight": "#d13438",    # 数据变化高亮 (深红)
-            "line_hl": "#e1f0fa",      # 源码行高亮 (浅蓝背景)
-            "mem_bg": "#ffffff",       # 内存/源码背景 (纯白)
-            "mem_fg": "#0451a5",       # 内存/数值颜色 (深蓝)
-            "stat_ok": "#107c10",      # 状态正常 (深绿)
-            "stat_err": "#d13438"      # 状态异常 (红)
+            "highlight": "#d13438",    # Highlight Change (Red)
+            "line_hl": "#e1f0fa",      # Source Line Highlight
+            "mem_bg": "#ffffff",       # Memory/Source Background (White)
+            "mem_fg": "#0451a5",       # Memory Data (Deep Blue)
+            "stat_ok": "#107c10",      # Status OK (Green)
+            "stat_err": "#d13438"      # Status Error (Red)
         }
         
-        # --- 2. 配置样式 ---
+        # --- 2. Configure Style ---
         self.style = ttk.Style()
         if 'clam' in self.style.theme_names():
             self.style.theme_use('clam')
@@ -39,45 +41,45 @@ class ModernY86Visualizer:
         self.configure_styles()
         self.root.configure(bg=self.colors["bg"])
 
-        # --- 3. 数据状态 ---
+        # --- 3. Data State ---
         self.states = []
         self.current_step = 0
         self.reg_widgets = {} 
         self.pc_to_line = {} 
         
-        # --- 4. 构建界面 ---
+        # --- 4. Build UI ---
         self.setup_ui()
 
     def configure_styles(self):
-        # 通用 Frame
+        # General Frame
         self.style.configure("TFrame", background=self.colors["bg"])
         self.style.configure("Panel.TFrame", background=self.colors["panel_bg"], relief="flat")
         
-        # UI 标签
+        # UI Labels
         self.style.configure("TLabel", 
             background=self.colors["bg"], 
             foreground=self.colors["fg"], 
-            font=(self.font_ui, 11)
+            font=(self.font_ui, 10)
         )
         self.style.configure("Header.TLabel", 
             background=self.colors["panel_bg"], 
             foreground=self.colors["fg"], 
-            font=(self.font_ui, 12, "bold")
+            font=(self.font_ui, 11, "bold")
         )
         
-        # 数值标签 (使用深蓝)
+        # Value Labels
         self.style.configure("Value.TLabel", 
             background=self.colors["panel_bg"], 
             foreground=self.colors["mem_fg"], 
             font=(self.font_code, 11)
         )
         
-        # 按钮样式
+        # Button Style
         self.style.configure("Accent.TButton", 
             background=self.colors["accent"], 
             foreground="white", 
             borderwidth=0,
-            font=(self.font_ui, 11, "bold"),
+            font=(self.font_ui, 10, "bold"),
             padding=(15, 8)
         )
         self.style.map("Accent.TButton",
@@ -85,58 +87,58 @@ class ModernY86Visualizer:
             foreground=[('disabled', '#666666')]
         )
         
-        # 状态栏数值
+        # Status Bar Values
         self.style.configure("Status.TLabel", 
             background=self.colors["panel_bg"], 
             foreground=self.colors["stat_ok"], 
-            font=(self.font_code, 13, "bold")
+            font=(self.font_code, 12, "bold")
         )
 
     def setup_ui(self):
-        # === 顶部控制栏 ===
+        # === Top Control Bar ===
         control_bar = ttk.Frame(self.root, style="TFrame", padding=(10, 15))
         control_bar.pack(side=tk.TOP, fill=tk.X)
         
         btn_frame = ttk.Frame(control_bar, style="TFrame")
         btn_frame.pack(side=tk.LEFT)
         
-        self.btn_load = ttk.Button(btn_frame, text="📂 加载程序 (Load)", style="Accent.TButton", command=self.load_program)
+        self.btn_load = ttk.Button(btn_frame, text="📂 Load Program", style="Accent.TButton", command=self.load_program)
         self.btn_load.pack(side=tk.LEFT, padx=(0, 10))
         
-        self.btn_prev = ttk.Button(btn_frame, text="◀ 上一步", style="Accent.TButton", command=self.prev_step, state=tk.DISABLED)
+        self.btn_prev = ttk.Button(btn_frame, text="◀ Step Back", style="Accent.TButton", command=self.prev_step, state=tk.DISABLED)
         self.btn_prev.pack(side=tk.LEFT, padx=5)
         
-        self.btn_next = ttk.Button(btn_frame, text="下一步 ▶", style="Accent.TButton", command=self.next_step, state=tk.DISABLED)
+        self.btn_next = ttk.Button(btn_frame, text="Step Over ▶", style="Accent.TButton", command=self.next_step, state=tk.DISABLED)
         self.btn_next.pack(side=tk.LEFT, padx=5)
 
-        self.lbl_progress = ttk.Label(control_bar, text="就绪 (Ready)", font=(self.font_ui, 11))
+        self.lbl_progress = ttk.Label(control_bar, text="Ready", font=(self.font_ui, 10))
         self.lbl_progress.pack(side=tk.RIGHT, padx=10)
 
-        # === 主内容区 (三栏布局) ===
+        # === Main Content Area (3 Columns) ===
         main_pane = ttk.Frame(self.root, style="TFrame", padding=10)
         main_pane.pack(fill=tk.BOTH, expand=True)
         
-        main_pane.columnconfigure(0, weight=1) # 寄存器
-        main_pane.columnconfigure(1, weight=2) # 源代码
-        main_pane.columnconfigure(2, weight=1) # 内存
+        main_pane.columnconfigure(0, weight=1) # Registers
+        main_pane.columnconfigure(1, weight=2) # Source Code
+        main_pane.columnconfigure(2, weight=1) # Memory
         main_pane.rowconfigure(0, weight=1)
 
-        # --- 第一栏：CPU 状态 ---
+        # --- Column 1: CPU State ---
         left_panel = ttk.Frame(main_pane, style="TFrame")
         left_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
         self.create_status_card(left_panel)
         self.create_register_card(left_panel)
 
-        # --- 第二栏：源代码 ---
+        # --- Column 2: Source Code ---
         mid_panel = ttk.Frame(main_pane, style="Panel.TFrame")
         mid_panel.grid(row=0, column=1, sticky="nsew", padx=(0, 10))
         
-        ttk.Label(mid_panel, text="源代码 (Source Code)", style="Header.TLabel", padding=10).pack(fill=tk.X)
+        ttk.Label(mid_panel, text="Source Code (.yo)", style="Header.TLabel", padding=10).pack(fill=tk.X)
         
         src_frame = ttk.Frame(mid_panel, style="Panel.TFrame")
         src_frame.pack(fill=tk.BOTH, expand=True, padx=2, pady=2)
         
-        # 源码区域：纯白背景
+        # Source code area
         self.src_text = tk.Text(src_frame,
             bg=self.colors["mem_bg"], 
             fg=self.colors["fg"],
@@ -157,11 +159,11 @@ class ModernY86Visualizer:
         src_scroll_x.pack(side=tk.BOTTOM, fill=tk.X)
         self.src_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-        # --- 第三栏：内存 ---
+        # --- Column 3: Memory ---
         right_panel = ttk.Frame(main_pane, style="Panel.TFrame")
         right_panel.grid(row=0, column=2, sticky="nsew")
         
-        ttk.Label(right_panel, text="内存视图 (Memory)", style="Header.TLabel", padding=10).pack(fill=tk.X)
+        ttk.Label(right_panel, text="Memory Map", style="Header.TLabel", padding=10).pack(fill=tk.X)
         
         mem_frame = ttk.Frame(right_panel, style="Panel.TFrame")
         mem_frame.pack(fill=tk.BOTH, expand=True, padx=2, pady=2)
@@ -185,7 +187,7 @@ class ModernY86Visualizer:
         card = ttk.Frame(parent, style="Panel.TFrame", padding=15)
         card.pack(fill=tk.X, pady=(0, 10))
         
-        ttk.Label(card, text="处理器状态 (Status)", style="Header.TLabel").pack(anchor="w", pady=(0, 10))
+        ttk.Label(card, text="CPU Status", style="Header.TLabel").pack(anchor="w", pady=(0, 10))
         
         content = ttk.Frame(card, style="Panel.TFrame")
         content.pack(fill=tk.X)
@@ -197,18 +199,18 @@ class ModernY86Visualizer:
         ttk.Label(pc_frame, text="PC", foreground="#666666", background=self.colors["panel_bg"]).pack(anchor="w")
         ttk.Label(pc_frame, textvariable=self.var_pc, style="Status.TLabel", foreground=self.colors["accent"]).pack(anchor="w")
         
-        # CC
-        self.var_cc = tk.StringVar(value="Z=1 S=0 O=0")
+        # CC (Updated to ZF/SF/OF)
+        self.var_cc = tk.StringVar(value="ZF=1 SF=0 OF=0")
         cc_frame = ttk.Frame(content, style="Panel.TFrame")
         cc_frame.pack(side=tk.LEFT, padx=(0, 15))
-        ttk.Label(cc_frame, text="CC", foreground="#666666", background=self.colors["panel_bg"]).pack(anchor="w")
+        ttk.Label(cc_frame, text="Flags", foreground="#666666", background=self.colors["panel_bg"]).pack(anchor="w")
         ttk.Label(cc_frame, textvariable=self.var_cc, style="Status.TLabel", foreground=self.colors["fg"]).pack(anchor="w")
 
         # STAT
         self.var_stat = tk.StringVar(value="AOK")
         stat_frame = ttk.Frame(content, style="Panel.TFrame")
         stat_frame.pack(side=tk.LEFT)
-        ttk.Label(stat_frame, text="STAT", foreground="#666666", background=self.colors["panel_bg"]).pack(anchor="w")
+        ttk.Label(stat_frame, text="Stat", foreground="#666666", background=self.colors["panel_bg"]).pack(anchor="w")
         self.lbl_stat = ttk.Label(stat_frame, textvariable=self.var_stat, style="Status.TLabel")
         self.lbl_stat.pack(anchor="w")
 
@@ -216,7 +218,7 @@ class ModernY86Visualizer:
         card = ttk.Frame(parent, style="Panel.TFrame", padding=15)
         card.pack(fill=tk.BOTH, expand=True)
         
-        ttk.Label(card, text="通用寄存器 (Registers)", style="Header.TLabel").pack(anchor="w", pady=(0, 10))
+        ttk.Label(card, text="Registers", style="Header.TLabel").pack(anchor="w", pady=(0, 10))
         
         grid_frame = ttk.Frame(card, style="Panel.TFrame")
         grid_frame.pack(fill=tk.BOTH, expand=True)
@@ -319,7 +321,8 @@ class ModernY86Visualizer:
         self.var_pc.set(f"0x{current_pc:x}")
         
         cc = state['CC']
-        self.var_cc.set(f"Z={cc['ZF']} S={cc['SF']} O={cc['OF']}")
+        # Updated to display full flags
+        self.var_cc.set(f"ZF={cc['ZF']} SF={cc['SF']} OF={cc['OF']}")
         
         stat_map = {1: "AOK", 2: "HLT", 3: "ADR", 4: "INS"}
         stat_val = stat_map.get(state['STAT'], str(state['STAT']))
