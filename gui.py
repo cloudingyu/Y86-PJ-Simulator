@@ -146,7 +146,7 @@ class ModernY86Visualizer:
         btn_frame = ttk.Frame(control_bar, style="TFrame")
         btn_frame.pack(side=tk.LEFT)
         
-        self.btn_load = ttk.Button(btn_frame, text="📂 Load", style="Accent.TButton", command=self.load_program)
+        self.btn_load = ttk.Button(btn_frame, text="Load", style="Accent.TButton", command=self.load_program)
         self.btn_load.pack(side=tk.LEFT, padx=(0, 20))
         
         self.btn_prev = ttk.Button(btn_frame, text="◀ Prev", style="Accent.TButton", command=self.prev_step, state=tk.DISABLED)
