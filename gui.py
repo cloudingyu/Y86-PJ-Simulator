@@ -9,28 +9,30 @@ import re
 class ModernY86Visualizer:
     def __init__(self, root):
         self.root = root
-        self.root.title("Y86-64 Simulator - Large Font Edition")
-        # 增加窗口初始大小以适应大字体
-        self.root.geometry("1400x900") 
+        self.root.title("Y86-64 Simulator - Ultimate GUI")
+        self.root.geometry("1400x900")
         
         # --- 字体配置 ---
+        # 1. 代码/数据字体: 用于寄存器、内存、源码、HEX值 (硬核风格)
         self.font_code = "Maple Mono"
-        self.font_ui = "Segoe UI" 
+        # 2. 界面字体: 用于按钮、标题、标签 (人文风格)
+        self.font_ui = "LXGW Wenkai Mono"
         
         # --- 配色方案 (Light Theme) ---
         self.colors = {
-            "bg": "#fafafa",           
-            "panel_bg": "#f3f3f3",     
-            "fg": "#333333",           
-            "accent": "#0078d4",       
+            "bg": "#fafafa",           # 整体背景
+            "panel_bg": "#f3f3f3",     # 面板背景
+            "fg": "#333333",           # 默认文字
+            "accent": "#0078d4",       # 强调色 (蓝)
             "accent_hover": "#2b88d8", 
-            "highlight": "#d13438",    
-            "line_hl": "#e1f0fa",      
-            "mem_bg": "#ffffff",       
-            "mem_fg": "#0451a5",       
-            "stat_ok": "#107c10",      
-            "stat_err": "#d13438",
-            "cache_title": "#d13438"   
+            "highlight": "#d13438",    # 数据变化高亮 (红)
+            "line_hl": "#e1f0fa",      # 源码行高亮 (浅蓝)
+            "mem_bg": "#ffffff",       # 表格/源码背景
+            "mem_fg": "#0451a5",       # 数据颜色 (深蓝)
+            "stat_ok": "#107c10",      # 状态正常 (绿)
+            "stat_err": "#d13438",     # 状态错误 (红)
+            "cache_title": "#d13438",  # Cache 标题颜色
+            "grid_line": "#e0e0e0"     # 表格线颜色
         }
         
         self.style = ttk.Style()
@@ -48,65 +50,83 @@ class ModernY86Visualizer:
         self.setup_ui()
 
     def configure_styles(self):
+        # 基础样式
         self.style.configure("TFrame", background=self.colors["bg"])
         self.style.configure("Panel.TFrame", background=self.colors["panel_bg"], relief="flat")
         
-        # [修改] 调大 UI 标签字体 (10 -> 12)
+        # UI 标签 (LXGW)
         self.style.configure("TLabel", 
             background=self.colors["bg"], 
             foreground=self.colors["fg"], 
             font=(self.font_ui, 12)
         )
-        # [修改] 调大标题字体 (11 -> 14)
         self.style.configure("Header.TLabel", 
             background=self.colors["panel_bg"], 
             foreground=self.colors["fg"], 
             font=(self.font_ui, 14, "bold")
         )
         
-        # [修改] 调大数值字体 (11 -> 13)
+        # 数值标签 (Maple)
         self.style.configure("Value.TLabel", 
             background=self.colors["panel_bg"], 
             foreground=self.colors["mem_fg"], 
             font=(self.font_code, 13)
         )
         
-        # [修改] 调大按钮字体 (10 -> 12)
+        # 按钮样式 (LXGW)
         self.style.configure("Accent.TButton", 
             background=self.colors["accent"], 
             foreground="white", 
             borderwidth=0,
             font=(self.font_ui, 12, "bold"),
-            padding=(15, 10) # 增加内边距
+            padding=(15, 10)
         )
         self.style.map("Accent.TButton",
             background=[('active', self.colors["accent_hover"]), ('disabled', '#cccccc')],
             foreground=[('disabled', '#666666')]
         )
         
-        # [修改] 调大状态栏数值 (12 -> 15)
+        # 状态栏样式 (Maple)
         self.style.configure("Status.TLabel", 
             background=self.colors["panel_bg"], 
             foreground=self.colors["stat_ok"], 
             font=(self.font_code, 15, "bold")
         )
-        
-        # [修改] 调大 Cache 标题 (12 -> 15)
         self.style.configure("Cache.TLabel", 
             background=self.colors["panel_bg"], 
             foreground=self.colors["cache_title"], 
             font=(self.font_code, 15, "bold")
         )
 
+        # 表格 (Treeview) 样式
+        self.style.configure("Treeview.Heading", 
+            font=(self.font_ui, 12, "bold"),
+            background=self.colors["panel_bg"],
+            foreground=self.colors["fg"],
+            relief="flat"
+        )
+        self.style.configure("Treeview", 
+            background=self.colors["mem_bg"],
+            foreground=self.colors["mem_fg"],
+            fieldbackground=self.colors["mem_bg"],
+            font=(self.font_code, 13),
+            rowheight=28,
+            borderwidth=0
+        )
+        self.style.map('Treeview', 
+            background=[('selected', self.colors["line_hl"])], 
+            foreground=[('selected', self.colors["mem_fg"])]
+        )
+
     def setup_ui(self):
-        # 顶部控制栏
+        # 1. 顶部控制栏
         control_bar = ttk.Frame(self.root, style="TFrame", padding=(15, 20))
         control_bar.pack(side=tk.TOP, fill=tk.X)
         
         btn_frame = ttk.Frame(control_bar, style="TFrame")
         btn_frame.pack(side=tk.LEFT)
         
-        self.btn_load = ttk.Button(btn_frame, text="📂 Load Program", style="Accent.TButton", command=self.load_program)
+        self.btn_load = ttk.Button(btn_frame, text="Load", style="Accent.TButton", command=self.load_program)
         self.btn_load.pack(side=tk.LEFT, padx=(0, 15))
         
         self.btn_prev = ttk.Button(btn_frame, text="◀ Step Back", style="Accent.TButton", command=self.prev_step, state=tk.DISABLED)
@@ -115,20 +135,19 @@ class ModernY86Visualizer:
         self.btn_next = ttk.Button(btn_frame, text="Step Over ▶", style="Accent.TButton", command=self.next_step, state=tk.DISABLED)
         self.btn_next.pack(side=tk.LEFT, padx=8)
 
-        # [修改] 进度条字体 (10 -> 12)
         self.lbl_progress = ttk.Label(control_bar, text="Ready", font=(self.font_ui, 12))
         self.lbl_progress.pack(side=tk.RIGHT, padx=15)
 
-        # 主内容区
+        # 2. 主内容区 (三栏布局)
         main_pane = ttk.Frame(self.root, style="TFrame", padding=15)
         main_pane.pack(fill=tk.BOTH, expand=True)
         
-        main_pane.columnconfigure(0, weight=1) 
-        main_pane.columnconfigure(1, weight=2) 
-        main_pane.columnconfigure(2, weight=1) 
+        main_pane.columnconfigure(0, weight=1) # 左：状态
+        main_pane.columnconfigure(1, weight=2) # 中：源码
+        main_pane.columnconfigure(2, weight=1) # 右：内存
         main_pane.rowconfigure(0, weight=1)
 
-        # 左侧
+        # --- 左侧面板 ---
         left_panel = ttk.Frame(main_pane, style="TFrame")
         left_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 15))
         
@@ -136,16 +155,15 @@ class ModernY86Visualizer:
         self.create_cache_card(left_panel)
         self.create_register_card(left_panel)
 
-        # 中间：源代码
+        # --- 中间面板：源代码 ---
         mid_panel = ttk.Frame(main_pane, style="Panel.TFrame")
         mid_panel.grid(row=0, column=1, sticky="nsew", padx=(0, 15))
         
-        ttk.Label(mid_panel, text="Source Code (.yo)", style="Header.TLabel", padding=15).pack(fill=tk.X)
+        ttk.Label(mid_panel, text="Source Code", style="Header.TLabel", padding=15).pack(fill=tk.X)
         
         src_frame = ttk.Frame(mid_panel, style="Panel.TFrame")
         src_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
-        # [修改] 源码字体 (11 -> 13)
         self.src_text = tk.Text(src_frame,
             bg=self.colors["mem_bg"], 
             fg=self.colors["fg"],
@@ -154,7 +172,8 @@ class ModernY86Visualizer:
             bd=0,
             highlightthickness=0,
             state=tk.DISABLED,
-            wrap=tk.NONE
+            wrap=tk.NONE,
+            padx=15, pady=10
         )
         self.src_text.tag_config("current_line", background=self.colors["line_hl"])
         
@@ -166,52 +185,53 @@ class ModernY86Visualizer:
         src_scroll_x.pack(side=tk.BOTTOM, fill=tk.X)
         self.src_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-        # 右侧：内存
+        # --- 右侧面板：内存 (表格) ---
         right_panel = ttk.Frame(main_pane, style="Panel.TFrame")
         right_panel.grid(row=0, column=2, sticky="nsew")
         
-        ttk.Label(right_panel, text="Memory Map", style="Header.TLabel", padding=15).pack(fill=tk.X)
+        ttk.Label(right_panel, text="Memory", style="Header.TLabel", padding=15).pack(fill=tk.X)
         
         mem_frame = ttk.Frame(right_panel, style="Panel.TFrame")
         mem_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
-        # [修改] 内存字体 (11 -> 13)
-        self.mem_text = tk.Text(mem_frame, 
-            bg=self.colors["mem_bg"], 
-            fg=self.colors["mem_fg"],
-            insertbackground="black",
-            font=(self.font_code, 13),
-            bd=0,
-            highlightthickness=0,
-            state=tk.DISABLED
-        )
-        mem_scroll = ttk.Scrollbar(mem_frame, orient="vertical", command=self.mem_text.yview)
-        self.mem_text.configure(yscrollcommand=mem_scroll.set)
+        # 使用 Treeview
+        columns = ("addr", "val")
+        self.mem_tree = ttk.Treeview(mem_frame, columns=columns, show="headings", selectmode="browse")
+        
+        self.mem_tree.heading("addr", text="Address")
+        self.mem_tree.heading("val", text="Value (Hex)")
+        self.mem_tree.column("addr", width=120, anchor="center")
+        self.mem_tree.column("val", width=220, anchor="center")
+        
+        mem_scroll = ttk.Scrollbar(mem_frame, orient="vertical", command=self.mem_tree.yview)
+        self.mem_tree.configure(yscrollcommand=mem_scroll.set)
         
         mem_scroll.pack(side=tk.RIGHT, fill=tk.Y)
-        self.mem_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.mem_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
     def create_status_card(self, parent):
         card = ttk.Frame(parent, style="Panel.TFrame", padding=20)
         card.pack(fill=tk.X, pady=(0, 15))
-        
         ttk.Label(card, text="CPU Status", style="Header.TLabel").pack(anchor="w", pady=(0, 15))
         
         content = ttk.Frame(card, style="Panel.TFrame")
         content.pack(fill=tk.X)
         
+        # PC
         self.var_pc = tk.StringVar(value="0x0")
         pc_frame = ttk.Frame(content, style="Panel.TFrame")
         pc_frame.pack(side=tk.LEFT, padx=(0, 20))
         ttk.Label(pc_frame, text="PC", foreground="#666666", background=self.colors["panel_bg"]).pack(anchor="w")
         ttk.Label(pc_frame, textvariable=self.var_pc, style="Status.TLabel", foreground=self.colors["accent"]).pack(anchor="w")
         
+        # CC
         self.var_cc = tk.StringVar(value="ZF=1 SF=0 OF=0")
         cc_frame = ttk.Frame(content, style="Panel.TFrame")
         cc_frame.pack(side=tk.LEFT, padx=(0, 20))
         ttk.Label(cc_frame, text="Flags", foreground="#666666", background=self.colors["panel_bg"]).pack(anchor="w")
         ttk.Label(cc_frame, textvariable=self.var_cc, style="Status.TLabel", foreground=self.colors["fg"]).pack(anchor="w")
 
+        # STAT
         self.var_stat = tk.StringVar(value="AOK")
         stat_frame = ttk.Frame(content, style="Panel.TFrame")
         stat_frame.pack(side=tk.LEFT)
@@ -222,8 +242,7 @@ class ModernY86Visualizer:
     def create_cache_card(self, parent):
         card = ttk.Frame(parent, style="Panel.TFrame", padding=20)
         card.pack(fill=tk.X, pady=(0, 15))
-        
-        ttk.Label(card, text="Cache Statistics", style="Header.TLabel").pack(anchor="w", pady=(0, 15))
+        ttk.Label(card, text="Cache", style="Header.TLabel").pack(anchor="w", pady=(0, 15))
         
         content = ttk.Frame(card, style="Panel.TFrame")
         content.pack(fill=tk.X)
@@ -243,13 +262,12 @@ class ModernY86Visualizer:
         self.var_rate = tk.StringVar(value="0.0%")
         f3 = ttk.Frame(content, style="Panel.TFrame")
         f3.pack(side=tk.LEFT)
-        ttk.Label(f3, text="Hit Rate", foreground="#666666", background=self.colors["panel_bg"]).pack(anchor="w")
+        ttk.Label(f3, text="Rate", foreground="#666666", background=self.colors["panel_bg"]).pack(anchor="w")
         ttk.Label(f3, textvariable=self.var_rate, style="Cache.TLabel").pack(anchor="w")
 
     def create_register_card(self, parent):
         card = ttk.Frame(parent, style="Panel.TFrame", padding=20)
         card.pack(fill=tk.BOTH, expand=True)
-        
         ttk.Label(card, text="Registers", style="Header.TLabel").pack(anchor="w", pady=(0, 15))
         
         grid_frame = ttk.Frame(card, style="Panel.TFrame")
@@ -260,7 +278,6 @@ class ModernY86Visualizer:
         
         for i, rname in enumerate(regs):
             row = i
-            # [修改] 寄存器名字体 (11 -> 13)
             lbl_name = ttk.Label(grid_frame, text=f"%{rname}", width=5, 
                                background=self.colors["panel_bg"], foreground="#666666", font=(self.font_code, 13))
             lbl_name.grid(row=row, column=0, sticky="w", pady=3)
@@ -284,7 +301,7 @@ class ModernY86Visualizer:
         try:
             with open(filename, 'r', encoding='utf-8', errors='ignore') as f:
                 input_data = f.read()
-            
+                
             result = subprocess.run([bin_path, '-v'], input=input_data, text=True, capture_output=True, encoding='utf-8')
             
             if result.returncode != 0 and not result.stdout:
@@ -320,29 +337,24 @@ class ModernY86Visualizer:
         for i, line in enumerate(lines):
             match = re.match(r'\s*(0x[0-9a-fA-F]+):', line)
             if match:
-                address_str = match.group(1)
                 try:
-                    address = int(address_str, 16)
-                    if address not in self.pc_to_line:
-                        self.pc_to_line[address] = i + 1
-                except ValueError:
-                    pass
+                    address = int(match.group(1), 16)
+                    if address not in self.pc_to_line: self.pc_to_line[address] = i + 1
+                except ValueError: pass
 
     def next_step(self):
         if self.current_step < len(self.states) - 1:
             self.current_step += 1
             self.update_display()
             self.btn_prev.config(state=tk.NORMAL)
-            if self.current_step == len(self.states) - 1:
-                self.btn_next.config(state=tk.DISABLED)
+            if self.current_step == len(self.states) - 1: self.btn_next.config(state=tk.DISABLED)
 
     def prev_step(self):
         if self.current_step > 0:
             self.current_step -= 1
             self.update_display()
             self.btn_next.config(state=tk.NORMAL)
-            if self.current_step == 0:
-                self.btn_prev.config(state=tk.DISABLED)
+            if self.current_step == 0: self.btn_prev.config(state=tk.DISABLED)
 
     def update_display(self):
         state = self.states[self.current_step]
@@ -379,42 +391,42 @@ class ModernY86Visualizer:
             self.src_text.tag_add("current_line", f"{line_num}.0", f"{line_num+1}.0")
             self.src_text.see(f"{line_num}.0")
 
-        # Registers
+        # Registers (Unsigned Hex Fix)
         reg_data = state['REG']
         prev_reg = prev_state['REG'] if prev_state else None
         
         for rname, val in reg_data.items():
             widget = self.reg_widgets.get(rname)
             if widget:
-                hex_val = f"0x{val:016x}"
+                # 核心修复：强制转为无符号 64 位显示
+                unsigned_val = val & 0xFFFFFFFFFFFFFFFF
+                hex_val = f"0x{unsigned_val:016x}"
                 widget.config(text=hex_val)
                 
-                # [修改] 变化高亮字体加粗加大 (11 -> 13)
-                if prev_reg and prev_reg.get(rname) != val:
+                is_changed = prev_reg and prev_reg.get(rname) != val
+                if is_changed:
                     widget.configure(foreground=self.colors["highlight"], font=(self.font_code, 13, "bold"))
                 else:
                     widget.configure(foreground=self.colors["mem_fg"], font=(self.font_code, 13))
 
-        # Memory
-        self.mem_text.config(state=tk.NORMAL)
-        self.mem_text.delete(1.0, tk.END)
+        # Memory (Treeview update with Unsigned Hex Fix)
+        for item in self.mem_tree.get_children():
+            self.mem_tree.delete(item)
         
         mem_data = state['MEM']
         sorted_addr = sorted([int(k) for k in mem_data.keys()])
         
         for addr in sorted_addr:
             val = mem_data[str(addr)]
-            line = f"0x{addr:04x}: 0x{val:016x}\n"
-            self.mem_text.insert(tk.END, line)
-            
-        self.mem_text.config(state=tk.DISABLED)
+            # 核心修复：强制转为无符号 64 位显示
+            unsigned_val = val & 0xFFFFFFFFFFFFFFFF
+            self.mem_tree.insert("", "end", values=(f"0x{addr:04x}", f"0x{unsigned_val:016x}"))
 
 if __name__ == "__main__":
     root = tk.Tk()
     try:
         from ctypes import windll
         windll.shcore.SetProcessDpiAwareness(1)
-    except:
-        pass
+    except: pass
     app = ModernY86Visualizer(root)
     root.mainloop()
