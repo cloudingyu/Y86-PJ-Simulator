@@ -9,27 +9,26 @@ import re
 class ModernY86Visualizer:
     def __init__(self, root):
         self.root = root
-        self.root.title("Y86-64 Simulator - Customized Font Edition")
+        self.root.title("Y86-64 Simulator - Light Mode")
         self.root.geometry("1300x750")
         
-        # --- 字体配置 (核心修改) ---
-        # 英文/代码/数据优先字体
+        # --- 字体配置 ---
         self.font_code = "Maple Mono"
-        # 中文/UI/注释优先字体
         self.font_ui = "LXGW Wenkai Mono"
         
-        # --- 1. 配色方案 (Dark Theme) ---
+        # --- 1. 配色方案 (Light Theme) ---
         self.colors = {
-            "bg": "#1e1e1e",           # 整体背景
-            "panel_bg": "#252526",     # 面板背景
-            "fg": "#d4d4d4",           # 默认文字
-            "accent": "#007acc",       # 强调色
-            "accent_hover": "#0098ff", 
-            "highlight": "#f44336",    # 数据变化高亮 (红)
-            "line_hl": "#3a3d41",      # 源码行高亮 (深灰)
-            "mem_bg": "#1e1e1e",       
-            "mem_fg": "#9cdcfe",       # 内存数据蓝
-            "comment": "#6a9955"       # 注释绿
+            "bg": "#fafafa",           # 整体背景 (浅灰白)
+            "panel_bg": "#f3f3f3",     # 面板背景 (稍深一点的灰)
+            "fg": "#333333",           # 默认文字 (深灰)
+            "accent": "#0078d4",       # 强调色 (Win10 蓝)
+            "accent_hover": "#2b88d8", 
+            "highlight": "#d13438",    # 数据变化高亮 (深红)
+            "line_hl": "#e1f0fa",      # 源码行高亮 (浅蓝背景)
+            "mem_bg": "#ffffff",       # 内存/源码背景 (纯白)
+            "mem_fg": "#0451a5",       # 内存/数值颜色 (深蓝)
+            "stat_ok": "#107c10",      # 状态正常 (深绿)
+            "stat_err": "#d13438"      # 状态异常 (红)
         }
         
         # --- 2. 配置样式 ---
@@ -54,7 +53,7 @@ class ModernY86Visualizer:
         self.style.configure("TFrame", background=self.colors["bg"])
         self.style.configure("Panel.TFrame", background=self.colors["panel_bg"], relief="flat")
         
-        # UI 标签：使用 LXGW Wenkai Mono
+        # UI 标签
         self.style.configure("TLabel", 
             background=self.colors["bg"], 
             foreground=self.colors["fg"], 
@@ -66,14 +65,14 @@ class ModernY86Visualizer:
             font=(self.font_ui, 12, "bold")
         )
         
-        # 数值标签：使用 Maple Mono
+        # 数值标签 (使用深蓝)
         self.style.configure("Value.TLabel", 
             background=self.colors["panel_bg"], 
-            foreground="#569cd6", 
+            foreground=self.colors["mem_fg"], 
             font=(self.font_code, 11)
         )
         
-        # 按钮样式：使用 LXGW Wenkai Mono
+        # 按钮样式
         self.style.configure("Accent.TButton", 
             background=self.colors["accent"], 
             foreground="white", 
@@ -82,14 +81,14 @@ class ModernY86Visualizer:
             padding=(15, 8)
         )
         self.style.map("Accent.TButton",
-            background=[('active', self.colors["accent_hover"]), ('disabled', '#3e3e42')],
-            foreground=[('disabled', '#a0a0a0')]
+            background=[('active', self.colors["accent_hover"]), ('disabled', '#cccccc')],
+            foreground=[('disabled', '#666666')]
         )
         
-        # 状态栏数值：使用 Maple Mono
+        # 状态栏数值
         self.style.configure("Status.TLabel", 
-            background=self.colors["bg"], 
-            foreground="#4ec9b0", 
+            background=self.colors["panel_bg"], 
+            foreground=self.colors["stat_ok"], 
             font=(self.font_code, 13, "bold")
         )
 
@@ -137,14 +136,12 @@ class ModernY86Visualizer:
         src_frame = ttk.Frame(mid_panel, style="Panel.TFrame")
         src_frame.pack(fill=tk.BOTH, expand=True, padx=2, pady=2)
         
-        # 源代码区域：为了同时支持中英文显示良好，建议使用 LXGW Wenkai Mono
-        # 或者如果你希望代码部分非常像代码，可以使用 Maple Mono (中文可能回退)
-        # 这里为了满足"中文使用LXGW"的需求（源码里有中文注释），我配置为 LXGW Wenkai Mono
+        # 源码区域：纯白背景
         self.src_text = tk.Text(src_frame,
-            bg=self.colors["bg"], 
+            bg=self.colors["mem_bg"], 
             fg=self.colors["fg"],
-            insertbackground="white",
-            font=(self.font_ui, 12), # 使用 LXGW 以确保注释显示完美
+            insertbackground="black",
+            font=(self.font_code, 11),
             bd=0,
             highlightthickness=0,
             state=tk.DISABLED,
@@ -169,12 +166,11 @@ class ModernY86Visualizer:
         mem_frame = ttk.Frame(right_panel, style="Panel.TFrame")
         mem_frame.pack(fill=tk.BOTH, expand=True, padx=2, pady=2)
         
-        # 内存数据纯粹是 Hex，使用 Maple Mono 效果最好
         self.mem_text = tk.Text(mem_frame, 
             bg=self.colors["mem_bg"], 
             fg=self.colors["mem_fg"],
-            insertbackground="white",
-            font=(self.font_code, 12), # Maple Mono
+            insertbackground="black",
+            font=(self.font_code, 11),
             bd=0,
             highlightthickness=0,
             state=tk.DISABLED
@@ -198,21 +194,21 @@ class ModernY86Visualizer:
         self.var_pc = tk.StringVar(value="0x0")
         pc_frame = ttk.Frame(content, style="Panel.TFrame")
         pc_frame.pack(side=tk.LEFT, padx=(0, 15))
-        ttk.Label(pc_frame, text="PC", foreground="#808080", background=self.colors["panel_bg"]).pack(anchor="w")
+        ttk.Label(pc_frame, text="PC", foreground="#666666", background=self.colors["panel_bg"]).pack(anchor="w")
         ttk.Label(pc_frame, textvariable=self.var_pc, style="Status.TLabel", foreground=self.colors["accent"]).pack(anchor="w")
         
         # CC
         self.var_cc = tk.StringVar(value="Z=1 S=0 O=0")
         cc_frame = ttk.Frame(content, style="Panel.TFrame")
         cc_frame.pack(side=tk.LEFT, padx=(0, 15))
-        ttk.Label(cc_frame, text="CC", foreground="#808080", background=self.colors["panel_bg"]).pack(anchor="w")
-        ttk.Label(cc_frame, textvariable=self.var_cc, style="Status.TLabel").pack(anchor="w")
+        ttk.Label(cc_frame, text="CC", foreground="#666666", background=self.colors["panel_bg"]).pack(anchor="w")
+        ttk.Label(cc_frame, textvariable=self.var_cc, style="Status.TLabel", foreground=self.colors["fg"]).pack(anchor="w")
 
         # STAT
         self.var_stat = tk.StringVar(value="AOK")
         stat_frame = ttk.Frame(content, style="Panel.TFrame")
         stat_frame.pack(side=tk.LEFT)
-        ttk.Label(stat_frame, text="STAT", foreground="#808080", background=self.colors["panel_bg"]).pack(anchor="w")
+        ttk.Label(stat_frame, text="STAT", foreground="#666666", background=self.colors["panel_bg"]).pack(anchor="w")
         self.lbl_stat = ttk.Label(stat_frame, textvariable=self.var_stat, style="Status.TLabel")
         self.lbl_stat.pack(anchor="w")
 
@@ -230,12 +226,10 @@ class ModernY86Visualizer:
         
         for i, rname in enumerate(regs):
             row = i
-            # 寄存器名使用 Maple Mono 对齐
             lbl_name = ttk.Label(grid_frame, text=f"%{rname}", width=5, 
-                               background=self.colors["panel_bg"], foreground="#808080", font=(self.font_code, 12))
+                               background=self.colors["panel_bg"], foreground="#666666", font=(self.font_code, 11))
             lbl_name.grid(row=row, column=0, sticky="w", pady=2)
             
-            # 寄存器值使用 Maple Mono
             lbl_val = ttk.Label(grid_frame, text="0x0000000000000000", style="Value.TLabel")
             lbl_val.grid(row=row, column=1, sticky="e", padx=(10, 0), pady=2)
             
@@ -332,18 +326,18 @@ class ModernY86Visualizer:
         self.var_stat.set(stat_val)
         
         if state['STAT'] != 1:
-            self.lbl_stat.configure(foreground=self.colors["highlight"])
+            self.lbl_stat.configure(foreground=self.colors["stat_err"])
         else:
-            self.lbl_stat.configure(foreground="#4ec9b0")
+            self.lbl_stat.configure(foreground=self.colors["stat_ok"])
 
-        # 源码高亮
+        # Source Highlight
         self.src_text.tag_remove("current_line", "1.0", tk.END)
         line_num = self.pc_to_line.get(current_pc)
         if line_num:
             self.src_text.tag_add("current_line", f"{line_num}.0", f"{line_num+1}.0")
             self.src_text.see(f"{line_num}.0")
 
-        # 更新寄存器
+        # Registers
         reg_data = state['REG']
         prev_reg = prev_state['REG'] if prev_state else None
         
@@ -354,11 +348,11 @@ class ModernY86Visualizer:
                 widget.config(text=hex_val)
                 
                 if prev_reg and prev_reg.get(rname) != val:
-                    widget.configure(foreground=self.colors["highlight"], font=(self.font_code, 12, "bold"))
+                    widget.configure(foreground=self.colors["highlight"], font=(self.font_code, 11, "bold"))
                 else:
-                    widget.configure(foreground="#569cd6", font=(self.font_code, 12))
+                    widget.configure(foreground=self.colors["mem_fg"], font=(self.font_code, 11))
 
-        # 更新内存
+        # Memory
         self.mem_text.config(state=tk.NORMAL)
         self.mem_text.delete(1.0, tk.END)
         
